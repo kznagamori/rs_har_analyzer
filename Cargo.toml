@@ -1,0 +1,25 @@
+[package]
+name = "rs_har_analyzer"
+version = "0.1.0"
+edition = "2024"
+description = "HAR file analyzer that exports analysis results to Excel"
+authors = ["kznagamori <kazuyuki.nagamori@gmail.com>"]
+repository = "https://github.com/kznagamori/rs_har_analyzer"
+license = "MIT"
+
+[[bin]]
+name = "rs_har_analyzer"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+fern = { version = "0.6", features = ["colored"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+rust_xlsxwriter = "0.64"
+tokio = { version = "1.0", features = ["full"] }
+url = "2.5"
+base64 = "0.22"
