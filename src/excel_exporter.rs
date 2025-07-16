@@ -2,8 +2,10 @@
 
 use crate::har_types::AnalysisResult;
 use anyhow::{anyhow, Result};
-use log::info;
+use log::{info, warn};
 use rust_xlsxwriter::*;
+use std::fs;
+use std::path::Path;
 
 /// Excelエクスポータ
 pub struct ExcelExporter;
@@ -20,8 +22,24 @@ impl ExcelExporter {
     pub fn export(results: &[AnalysisResult], output_path: &str) -> Result<()> {
         info!("Excelファイルに出力しています: {}", output_path);
         
+        // 出力ディレクトリを作成（必要に応じて）
+        if let Some(parent) = Path::new(output_path).parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| anyhow!("出力ディレクトリの作成に失敗しました: {}", e))?;
+        }
+
         let mut workbook = Workbook::new();
         let worksheet = workbook.add_worksheet();
+        
+        // ベースファイル名を取得（拡張子なし）
+        let base_name = Path::new(output_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("output");
+        
+        let output_dir = Path::new(output_path)
+            .parent()
+            .unwrap_or(Path::new("."));
         
         // ヘッダー行の設定
         let header_format = Format::new()
@@ -66,9 +84,36 @@ impl ExcelExporter {
             worksheet.write_string_with_format(row_index, 2, &result.destination_ip, &cell_format)?;
             worksheet.write_string_with_format(row_index, 3, &result.method, &cell_format)?;
             worksheet.write_number_with_format(row_index, 4, result.status_code as f64, &cell_format)?;
-            worksheet.write_string_with_format(row_index, 5, &result.request_url, &cell_format)?;
-            worksheet.write_string_with_format(row_index, 6, &result.request_payload, &json_format)?;
-            worksheet.write_string_with_format(row_index, 7, &result.response_payload, &json_format)?;
+            
+            // URLの処理（長い場合は切り詰め）
+            let url_content = Self::handle_large_content(
+                &result.request_url, 
+                base_name, 
+                output_dir, 
+                row_index, 
+                5
+            )?;
+            worksheet.write_string_with_format(row_index, 5, &url_content, &cell_format)?;
+            
+            // リクエストペイロードの処理
+            let request_content = Self::handle_large_content(
+                &result.request_payload, 
+                base_name, 
+                output_dir, 
+                row_index, 
+                6
+            )?;
+            worksheet.write_string_with_format(row_index, 6, &request_content, &json_format)?;
+            
+            // レスポンスペイロードの処理
+            let response_content = Self::handle_large_content(
+                &result.response_payload, 
+                base_name, 
+                output_dir, 
+                row_index, 
+                7
+            )?;
+            worksheet.write_string_with_format(row_index, 7, &response_content, &json_format)?;
         }
         
         // 列幅の自動調整
@@ -80,6 +125,43 @@ impl ExcelExporter {
         
         info!("Excelファイルの出力が完了しました: {}", output_path);
         Ok(())
+    }
+
+    /// 大きなコンテンツを処理（必要に応じて外部ファイルに保存）
+    /// 
+    /// # Arguments
+    /// * `content` - 処理するコンテンツ
+    /// * `base_name` - ベースファイル名
+    /// * `output_dir` - 出力ディレクトリ
+    /// * `row` - 行番号
+    /// * `col` - 列番号
+    /// 
+    /// # Returns
+    /// * `Result<String>` - セルに入れる文字列
+    fn handle_large_content(
+        content: &str, 
+        base_name: &str, 
+        output_dir: &Path, 
+        row: u32, 
+        col: u16
+    ) -> Result<String> {
+        const EXCEL_LIMIT: usize = 32000; // 安全マージンを考慮
+        
+        if content.len() <= EXCEL_LIMIT {
+            Ok(content.to_string())
+        } else {
+            // 外部ファイルに保存
+            let filename = format!("{}_R{}C{}.txt", base_name, row, col);
+            let filepath = output_dir.join(&filename);
+            
+            fs::write(&filepath, content)
+                .map_err(|e| anyhow!("外部ファイルの書き込みに失敗しました: {}", e))?;
+            
+            warn!("大きなコンテンツを外部ファイルに保存しました: {}", filename);
+            
+            // セルには参照情報を保存
+            Ok(format!("ファイル参照: {} ({}文字)", filename, content.len()))
+        }
     }
 
     /// 列幅を自動調整
