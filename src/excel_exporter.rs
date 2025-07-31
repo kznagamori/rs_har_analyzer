@@ -11,6 +11,27 @@ use std::path::Path;
 pub struct ExcelExporter;
 
 impl ExcelExporter {
+    /// 行番号と列番号をExcel形式のセル参照に変換
+    /// 
+    /// # Arguments
+    /// * `row` - 行番号（1から開始）
+    /// * `col` - 列番号（0から開始）
+    /// 
+    /// # Returns
+    /// * `String` - Excel形式のセル参照（例: "A1", "B2", "AA10"）
+    fn to_excel_cell_reference(row: u32, col: u16) -> String {
+        let mut column_name = String::new();
+        let mut col_num = col as u32 + 1; // 1から開始に変換
+        
+        while col_num > 0 {
+            col_num -= 1;
+            column_name.insert(0, (b'A' + (col_num % 26) as u8) as char);
+            col_num /= 26;
+        }
+        
+        format!("{}{}", column_name, row)
+    }
+
     /// 解析結果をExcelファイルに出力
     /// 
     /// # Arguments
@@ -90,7 +111,7 @@ impl ExcelExporter {
                 &result.request_url, 
                 base_name, 
                 output_dir, 
-                row_index, 
+                row_index + 1, // ヘッダー行を考慮
                 5
             )?;
             worksheet.write_string_with_format(row_index, 5, &url_content, &cell_format)?;
@@ -100,7 +121,7 @@ impl ExcelExporter {
                 &result.request_payload, 
                 base_name, 
                 output_dir, 
-                row_index, 
+                row_index + 1, // ヘッダー行を考慮
                 6
             )?;
             worksheet.write_string_with_format(row_index, 6, &request_content, &json_format)?;
@@ -110,7 +131,7 @@ impl ExcelExporter {
                 &result.response_payload, 
                 base_name, 
                 output_dir, 
-                row_index, 
+                row_index + 1, // ヘッダー行を考慮
                 7
             )?;
             worksheet.write_string_with_format(row_index, 7, &response_content, &json_format)?;
@@ -151,7 +172,8 @@ impl ExcelExporter {
             Ok(content.to_string())
         } else {
             // 外部ファイルに保存
-            let filename = format!("{}_R{}C{}.txt", base_name, row, col);
+            let cell_ref = Self::to_excel_cell_reference(row, col);
+            let filename = format!("{}_{}.txt", base_name, cell_ref);
             let filepath = output_dir.join(&filename);
             
             fs::write(&filepath, content)
