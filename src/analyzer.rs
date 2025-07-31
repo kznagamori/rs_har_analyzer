@@ -80,7 +80,7 @@ impl HarAnalyzer {
                 destination_ip,
                 method: entry.request.method.clone(),
                 status_code: entry.response.status,
-                request_url: entry.request.url.clone(),
+                request_url: self.decode_url(&entry.request.url),
                 request_payload,
                 response_payload,
             };
@@ -254,6 +254,24 @@ impl HarAnalyzer {
                 }
             }
             Err(_) => json_str.to_string(),
+        }
+    }
+
+    /// URLをUTF-8でデコード
+    /// 
+    /// # Arguments
+    /// * `url_str` - エンコードされたURL文字列
+    /// 
+    /// # Returns
+    /// * `String` - デコードされたURL文字列
+    fn decode_url(&self, url_str: &str) -> String {
+        // パーセントエンコーディングをデコード
+        match urlencoding::decode(url_str) {
+            Ok(decoded) => decoded.into_owned(),
+            Err(_) => {
+                warn!("URLのデコードに失敗しました: {}", url_str);
+                url_str.to_string()
+            }
         }
     }
 }

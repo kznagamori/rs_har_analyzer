@@ -1,0 +1,13 @@
+[target.x86_64-pc-windows-gnu]
+rustflags = [
+  "-C", "target-feature=+crt-static",  # C ランタイムを静的リンク
+]
+
+[profile.release]
+opt-level = 3              # 最適化レベル (0～3, "s", "z")
+lto = true                 # Link Time Optimization
+codegen-units = 1          # コード生成ユニット数 (1 にすると最適なインライン化が可能)
+debug = false              # デバッグ情報を含めない
+panic = "abort"            # パニック時にスタック展開しない（サイズ削減）
+incremental = false        # インクリメンタルコンパイルをオフ
+strip = "symbols"          # （Cargo 1.60+）ビルド時に自動でシンボルを削除
